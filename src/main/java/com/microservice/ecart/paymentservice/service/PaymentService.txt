@@ -1,0 +1,69 @@
+package com.microservice.ecart.paymentservice.service;
+
+
+import com.microservice.ecart.paymentservice.model.Payment;
+import com.microservice.ecart.paymentservice.repository.PaymentRepository;
+import com.microservice.ecart.paymentservice.client.OrderClient;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.math.BigDecimal;
+import java.util.Optional;
+import java.util.Random;
+
+@Service
+public class PaymentService {
+
+    private final PaymentRepository paymentRepository;
+    private final RestTemplate restTemplate;
+    
+
+    public PaymentService(PaymentRepository paymentRepository, RestTemplate restTemplate) {
+        this.paymentRepository = paymentRepository;
+        this.restTemplate = restTemplate;
+        
+    }
+
+    public Payment processPayment(Long orderId, Long productId, BigDecimal amount) {
+        // Inter-service discovery calls using Eureka logical names
+        // String productDetails = restTemplate.getForObject("http://productservice/products/" + productId, String.class);
+        // String orderDetails = restTemplate.getForObject("http://orderservice/orders/" + orderId, String.class);
+
+        // Simulate 70% success rate, 30% failure rate
+        String status = new Random().nextInt(10) < 7 ? "SUCCESS" : "FAILED";
+
+        Payment payment = new Payment(orderId, productId, amount, status);
+        Payment savedPayment = paymentRepository.save(payment);
+     
+
+        // Notify Order Service of the outcome
+        // restTemplate.put("http://orderservice/orders/" + orderId + "/status/" + status, null);
+
+        return savedPayment;
+    }
+
+    public Payment refundPayment(Long paymentId) {
+        Optional<Payment> optionalPayment = paymentRepository.findById(paymentId);
+        if (optionalPayment.isPresent()) {
+            Payment payment = optionalPayment.get();
+            if ("SUCCESS".equals(payment.getStatus())) {
+                payment.setStatus("REFUNDED");
+                return paymentRepository.save(payment);
+            }
+        }
+        throw new RuntimeException("Payment not eligible for refund");
+    }
+
+    public String generateInvoice(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment record not found"));
+
+        return "=== INVOICE ===\n" +
+               "Transaction ID: " + payment.getId() + "\n" +
+               "Order ID: " + payment.getOrderId() + "\n" +
+               "Product ID: " + payment.getProductId() + "\n" +
+               "Amount: $" + payment.getAmount() + "\n" +
+               "Status: " + payment.getStatus() + "\n" +
+               "===============";
+    }
+}

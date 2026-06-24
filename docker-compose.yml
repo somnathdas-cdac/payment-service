@@ -1,1 +1,41 @@
 
+#version: '3.8'
+
+services:
+  payment-db:
+    image: mysql:8.0
+    container_name: payment-mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: "Som1234567"
+      MYSQL_DATABASE: "micro_service_payment_db"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_payment_data:/var/lib/mysql
+    networks:
+      - ecart-network
+    restart: always
+
+  payment-service:
+    image: ${REGISTRY_USERNAME}/payment-service:latest
+    container_name: payment-service-app
+    ports:
+      - "8083:8083"
+    environment:
+      # Overriding configurations dynamically to reference the Docker MySQL service container name
+      SPRING_DATASOURCE_URL: "jdbc:mysql://payment-db:3306/micro_service_payment_db?createDatabaseIfNotExist=true"
+      SPRING_DATASOURCE_USERNAME: "root"
+      SPRING_DATASOURCE_PASSWORD: "Som1234567"
+      EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE: "http://localhost:8761/eureka/"
+    depends_on:
+      - payment-db
+    networks:
+      - ecart-network
+    restart: unless-stopped
+
+volumes:
+  mysql_payment_data:
+
+networks:
+  ecart-network:
+    driver: bridge
